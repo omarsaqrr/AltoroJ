@@ -1,20 +1,3 @@
-/**
-This application is for demonstration use only. It contains known application security
-vulnerabilities that were created expressly for demonstrating the functionality of
-application security testing tools. These vulnerabilities may present risks to the
-technical environment in which the application is installed. You must delete and
-uninstall this demonstration application upon completion of the demonstration for
-which it is intended. 
-
-IBM DISCLAIMS ALL LIABILITY OF ANY KIND RESULTING FROM YOUR USE OF THE APPLICATION
-OR YOUR FAILURE TO DELETE THE APPLICATION FROM YOUR ENVIRONMENT UPON COMPLETION OF
-A DEMONSTRATION. IT IS YOUR RESPONSIBILITY TO DETERMINE IF THE PROGRAM IS APPROPRIATE
-OR SAFE FOR YOUR TECHNICAL ENVIRONMENT. NEVER INSTALL THE APPLICATION IN A PRODUCTION
-ENVIRONMENT. YOU ACKNOWLEDGE AND ACCEPT ALL RISKS ASSOCIATED WITH THE USE OF THE APPLICATION.
-
-IBM AltoroJ
-(c) Copyright IBM Corp. 2008, 2013 All Rights Reserved.
- */
 package com.ibm.security.appscan.altoromutual.servlet;
 
 import java.io.IOException;
@@ -24,7 +7,9 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 
+import com.ibm.security.appscan.altoromutual.model.User;
 
 /**
  * This servlet allows the users to view account and transaction information.
@@ -33,8 +18,8 @@ import javax.servlet.http.HttpServletResponse;
  *
  */
 public class AccountViewServlet extends HttpServlet {
-	private static final long serialVersionUID = 1L;
-       
+    private static final long serialVersionUID = 1L;
+
     /**
      * @see HttpServlet#HttpServlet()
      */
@@ -42,40 +27,77 @@ public class AccountViewServlet extends HttpServlet {
         super();
     }
 
-	/**
-	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
-	 */
-	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		//show account balance for a particular account
-		if (request.getRequestURL().toString().endsWith("showAccount")){
-			String accountName = request.getParameter("listAccounts");
-			if (accountName == null){
-				response.sendRedirect(request.getContextPath()+"/bank/main.jsp");
-				return;
-			}
-//			response.sendRedirect("/bank/balance.jsp&acctId=" + accountName);
-			RequestDispatcher dispatcher = request.getRequestDispatcher("/bank/balance.jsp?acctId=" + accountName);
-			dispatcher.forward(request, response);
-			return;
-		}
-		//this shouldn't happen
-		else if (request.getRequestURL().toString().endsWith("showTransactions"))
-			doPost(request,response);
-		else
-			super.doGet(request, response);
-	}
+    /**
+     * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
+     */
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        // Check if the user is authenticated
+        if (!isLoggedIn(request)) {
+            response.sendRedirect(request.getContextPath() + "/login.jsp"); // Redirect unauthorized users to login page
+            return;
+        }
 
-	/**
-	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
-	 */
-	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		//show transactions within the specified date range (if any)
-		if (request.getRequestURL().toString().endsWith("showTransactions")){
-			String startTime = request.getParameter("startDate");
-			String endTime = request.getParameter("endDate");
-			
-			RequestDispatcher dispatcher = request.getRequestDispatcher("/bank/transaction.jsp?" + ((startTime!=null)?"&startTime="+startTime:"") + ((endTime!=null)?"&endTime="+endTime:""));
-			dispatcher.forward(request, response);
-		}
-	}
+        // Show account balance for a particular account
+        if (request.getRequestURL().toString().endsWith("showAccount")) {
+            String accountName = request.getParameter("listAccounts");
+            if (accountName == null) {
+                response.sendRedirect(request.getContextPath() + "/bank/main.jsp");
+                return;
+            }
+
+            // Indirectly reference account-related information using session attribute
+            HttpSession session = request.getSession();
+            session.setAttribute("accountId", accountName);
+            RequestDispatcher dispatcher = request.getRequestDispatcher("/bank/balance.jsp");
+            dispatcher.forward(request, response);
+            return;
+        } else if (request.getRequestURL().toString().endsWith("showTransactions")) {
+            doPost(request, response);
+        } else {
+            super.doGet(request, response);
+        }
+    }
+
+    /**
+     * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
+     */
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        // Check if the user is authenticated
+        if (!isLoggedIn(request)) {
+            response.sendRedirect(request.getContextPath() + "/login.jsp"); // Redirect unauthorized users to login page
+            return;
+        }
+
+        // Show transactions within the specified date range (if any)
+        if (request.getRequestURL().toString().endsWith("showTransactions")) {
+            String startTime = request.getParameter("startDate");
+            String endTime = request.getParameter("endDate");
+
+            // Indirectly reference account-related information using session attribute
+            HttpSession session = request.getSession();
+            session.setAttribute("startTime", startTime);
+            session.setAttribute("endTime", endTime);
+
+            RequestDispatcher dispatcher = request.getRequestDispatcher("/bank/transaction.jsp");
+            dispatcher.forward(request, response);
+        }
+    }
+
+    /**
+     * Check if the user is authenticated
+     */
+    private boolean isLoggedIn(HttpServletRequest request) {
+        // Check if a session exists
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            // Check if the "user" attribute exists in the session
+            Object userAttribute = session.getAttribute("user");
+            if (userAttribute != null && userAttribute instanceof User) {
+                // Optionally, you may perform additional checks such as session expiration, IP validation, etc.
+                return true; // User is authenticated
+            }
+        }
+        return false; // User is not authenticated
+    }
+
 }
